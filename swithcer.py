@@ -1,0 +1,33 @@
+#import libaries
+print("a")
+from gpiozero import LED
+import time
+print("a")
+#defines the pins
+led1 = LED(23)
+print("a")
+led2 = LED(24)
+while True:
+	print("a")
+	led1.off()
+	time.sleep(1)
+	print("a")
+	led2.off()
+	time.sleep(1)
+	print("a")
+	led1.on()
+	print("a")
+	#a=input()
+	time.sleep(1)
+	print("a")
+	led2.on()
+	print("a")
+	#a=input()
+	time.sleep(1)
+	print("a")
+	led1.off()
+	time.sleep(1)
+	print("a")
+	led2.off()
+	time.sleep(1)
+	print("a")

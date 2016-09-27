@@ -1,0 +1,184 @@
+import serial, os, time
+import RPi.GPIO as GPIO
+
+#os.system('stty -F /dev/ttyAMC0 4800')
+
+GPIO.setwarnings(False)
+GPIO.setmode(GPIO.BCM)
+
+pinDATA = 4
+pinCLOCK = 27
+pinLATCH = 17
+pinLED1 = 26
+pinLED2 = 21
+
+GPIO.setup(pinDATA, GPIO.OUT)
+GPIO.setup(pinCLOCK, GPIO.OUT)
+GPIO.setup(pinLATCH, GPIO.OUT)
+GPIO.setup(pinLED1, GPIO.OUT)
+GPIO.setup(pinLED2, GPIO.OUT)
+
+GPIO.output(pinDATA, False)
+GPIO.output(pinCLOCK, False)
+GPIO.output(pinLATCH, False)
+GPIO.output(pinLED2, False)
+GPIO.output(pinLED1, True)	# Turn LED on
+
+# time.sleep(5)	# wait 5 seconds
+
+def clearLEDs():
+
+    GPIO.output(pinLATCH, False)
+
+    for push in range(0, 8):
+
+        GPIO.output(pinDATA, 255)
+        GPIO.output(pinCLOCK, True)
+        GPIO.output(pinCLOCK, False)
+
+    GPIO.output(pinLATCH, True)
+    return(0)
+
+clearLEDs()	# clear the display
+print "running"	# show the program is running
+time.sleep(30)	# delay to give the GPS a chance to run
+GPIO.output(pinLED1, False)	# turn LED off
+
+digits = [0b10010000, 0b11010111, 0b10001001, 0b10000011, 0b11000110, 0b10100010, 0b10100000, 0b10010111, 0b10000000, 0b10000010]
+digits2 = [0b11101111]
+
+powers = [1,2,4,8,16,32,64,128]
+
+def display(dataa, datab):
+
+    GPIO.output(pinLATCH, False)
+
+    for push in range(0, 8):
+
+	GPIO.output(pinDATA, dataa & powers[push])
+	GPIO.output(pinCLOCK, True)
+	GPIO.output(pinCLOCK, False)
+
+    for push in range(0, 8):
+
+	GPIO.output(pinDATA, datab & powers[push])
+	GPIO.output(pinCLOCK, True)
+	GPIO.output(pinCLOCK, False)
+
+    GPIO.output(pinLATCH, True)
+    return(0)
+
+def NoDisplay():
+    GPIO.output(pinLATCH, False)
+
+    for push in range(0, 8):
+
+	GPIO.output(pinDATA, digits2[0] & powers[push])
+	GPIO.output(pinCLOCK, True)
+	GPIO.output(pinCLOCK, False)
+#	print "first " + str(push)
+
+    GPIO.output(pinLATCH, True)
+    return(0)
+NoDisplay()
+    
+#def clearLEDs():
+
+ #   GPIO.output(pinLATCH, False)
+
+  #  for push in range(0, 8):
+
+#	GPIO.output(pinDATA, 255)
+#	GPIO.output(pinCLOCK, True)
+#	GPIO.output(pinCLOCK, False)
+
+ #   GPIO.output(pinLATCH, True)
+  #  return(0)
+
+clearLEDs()
+
+dataIndexa=0
+dataIndexb=0
+speed=0
+
+firstFixFlag = False # this will go true after the first GPS fix.
+firstFixDate = ""
+
+# Set up serial:
+ser = serial.Serial(
+    port='/dev/ttyACM0',\
+    baudrate=4800,\
+    parity=serial.PARITY_NONE,\
+    stopbits=serial.STOPBITS_ONE,\
+    bytesize=serial.EIGHTBITS,\
+        timeout=1)
+#########################
+GPIO.output(pinLED1, True)
+#########################
+
+# Helper function to take HHMM.SS, Hemisphere and make it decimal:
+def degrees_to_decimal(data, hemisphere):
+    try:
+        decimalPointPosition = data.index('.')
+        degrees = float(data[:decimalPointPosition-2])
+        minutes = float(data[decimalPointPosition-2:])/60
+        output = degrees + minutes
+        if hemisphere is 'N' or hemisphere is 'E':
+            return output
+        if hemisphere is 'S' or hemisphere is 'W':
+            return -output
+    except:
+        return ""
+
+# Helper function to take a $GPRMC sentence, and turn it into a Python dictionary.
+# This also calls degrees_to_decimal and stores the decimal values as well.
+def parse_GPRMC(data):
+    data = data.split(',')
+    dict = {
+            'fix_time': data[1],
+            'validity': data[2],
+            'latitude': data[3],
+            'latitude_hemisphere' : data[4],
+            'longitude' : data[5],
+            'longitude_hemisphere' : data[6],
+            'speed(Kn)': data[7],
+            'true_course': data[8],
+            'fix_date': data[9],
+            'variation': data[10],
+            'variation_e_w' : data[11],
+            'checksum' : data[12]
+    }
+    dict['decimal_latitude'] = degrees_to_decimal(dict['latitude'], dict['latitude_hemisphere'])
+    dict['decimal_longitude'] = degrees_to_decimal(dict['longitude'], dict['longitude_hemisphere'])
+    return dict
+
+# Main program loop:
+while True:
+#    print 1
+    line = ser.readline()
+    print line
+    if "$GPRMC" in line: # This will exclude other NMEA sentences the GPS unit provides.
+        print 2
+	gpsData = parse_GPRMC(line) # Turn a GPRMC sentence into a Python dictionary called gpsData
+	print gpsData
+	print gpsData['validity']
+        if gpsData['validity'] == "A": # If the sentence shows that there's a fix, then we can log the line
+	    print("A")
+	    GPIO.output(pinLED1, False)
+#            if firstFixFlag is False: # If we haven't found a fix before, then set the filename prefix with GPS date & time.
+ #               firstFixDate = gpsData['fix_date'] + "-" + gpsData['fix_time']
+  #              firstFixFlag = True
+   #         else: # write the data to a simple log file and then the raw data as well:
+    #            with open("/home/paul/" + firstFixDate +"-simple-log.txt", "a") as myfile:
+     #               myfile.write(gpsData['fix_date'] + "," + gpsData['fix_time'] + "," + str(gpsData['decimal_latitude']) + "," + str(gpsData['decimal_longitude']) +"\n")
+      #          with open("/home/paul/" + firstFixDate +"-gprmc-raw-log.txt", "a") as myfile:
+       #             myfile.write(line)
+	    speed = float(gpsData['speed(Kn)'])
+	    speed = int(speed)
+	else:
+	    speed=0
+    if speed > 99:
+	speed = 99
+    dataIndexa = digits[int((speed/10)%10)]
+    dataIndexb = digits[int(speed%10)]
+    display(dataIndexa, dataIndexb)

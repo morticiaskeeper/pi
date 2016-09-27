@@ -1,0 +1,11 @@
+level=0
+gpio pwm 1 0
+while [ $level -lt 1000]; do
+	level = $level + 1
+	gpio pwm 1 $level
+	sleep 1
+echo 'all up'
+while [ $level -gt 1]; do
+	level = $level - 1
+	gpio pwm 1 $level
+	sleep 0.5cho 'all down'
